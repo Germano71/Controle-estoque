@@ -16,8 +16,8 @@ table{width:100%;border-collapse:collapse}th,td{padding:9px;border-bottom:1px so
 </style></head><body>
 <header><h1>📦 Controle de Estoque V4</h1><div>🏬 Depósito ↔ 🛒 Área de Venda ↔ 🔴 Vencidos/Perdas</div></header>
 <main>
-<div class="grid"><div class="stat"><b id="dep">0</b>un. depósito</div><div class="stat"><b id="sale">0</b>un. venda</div><div class="stat"><b id="soon">0</b>próx. vencimento</div><div class="stat"><b id="loss">0</b>un. perdas</div></div>
-<section class="card"><div class="tabs"><button id="bdep" class="active" onclick="view='dep';render()">🏬 Depósito</button><button id="bsale" onclick="view='sale';render()">🛒 Venda</button><button id="bloss" onclick="view='loss';render()">🔴 Perdas</button><button id="ball" onclick="view='all';render()">📋 Todos</button></div></section>
+<div class="grid"><div class="stat"><b id="dep">0</b>un. depósito</div><div class="stat"><b id="sale">0</b>un. área de venda</div><div class="stat"><b id="soon">0</b>próx. vencimento</div><div class="stat"><b id="loss">0</b>un. perdas</div></div>
+<section class="card"><div class="tabs"><button id="bdep" class="active" onclick="view='dep';render()">🏬 Depósito</button><button id="bsale" onclick="view='sale';render()">🛒 Área de Venda</button><button id="bloss" onclick="view='loss';render()">🔴 Perdas</button><button id="ball" onclick="view='all';render()">📋 Todos</button></div></section>
 <section class="card"><h2>➕ Cadastrar produto/lote</h2>
 <div class="row"><select id="cat" onchange="features()"><option value="">Categoria</option><option>Bebidas</option><option>Alimentos</option><option>Limpeza</option><option>Higiene</option><option>Outros</option></select><input id="prod" placeholder="Produto"><input id="brand" placeholder="Marca"><input id="vol" placeholder="Volume"></div>
 <div class="row"><select id="feat"><option>Selecione</option></select><input id="ean" placeholder="Código de barras"><select id="ptype"><option value="unidade">Unidade</option><option value="fardo">Fardo</option><option value="caixa">Caixa</option></select><input id="packs" type="number" min="0" placeholder="Fardos/caixas"></div>
