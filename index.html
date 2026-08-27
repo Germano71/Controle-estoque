@@ -2,8 +2,8 @@
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <meta name="theme-color" content="#111827"><link rel="manifest" href="./manifest.json">
 <title>Controle de Estoque V5</title>
-<!-- Biblioteca do Scanner de Código de Barras -->
-<script src="https://unpkg.com" type="text/javascript"></script>
+<!-- Biblioteca do Scanner de Código de Barras (Carregamento Seguro) -->
+<script src="https://jsdelivr.net" type="text/javascript"></script>
 <style>
 body{font-family:Arial;margin:0;background:#f3f4f6;color:#111827}header{background:#111827;color:white;padding:18px}
 main{max-width:900px;margin:auto;padding:14px}.card{background:white;padding:15px;border-radius:14px;margin:12px 0;box-shadow:0 2px 8px #0001}
@@ -15,7 +15,7 @@ table{width:100%;border-collapse:collapse}th,td{padding:9px;border-bottom:1px so
 .ok{color:#166534}.soon{color:#92400e}.expired{color:#991b1b}
 .modal{display:none;position:fixed;inset:0;background:#0008;align-items:center;justify-content:center;padding:15px}.modal.open{display:flex}.modal>div{background:white;padding:18px;border-radius:14px;width:100%;max-width:520px}
 @media(max-width:700px){.grid{grid-template-columns:1fr 1fr}table,thead,tbody,tr,th,td{display:block}thead{display:none}tr{border:1px solid #ddd;border-radius:10px;margin:8px 0;padding:8px}td{border:0}}
-/* Alinhamento inteligente do campo e botão */
+/* Alinhamento do campo e botão */
 .barcode-wrapper{display:flex;gap:6px;align-items:center;flex:1;min-width:140px}.btn-scan{background:#2563eb;white-space:nowrap;width:auto;padding:11px 14px}
 </style></head><body>
 <header><h1>📦 Controle de Estoque V5</h1><div>🏬 Depósito ↔ 🛒 Área de Venda ↔ 🔴 Vencidos/Perdas</div></header>
@@ -33,7 +33,7 @@ table{width:100%;border-collapse:collapse}th,td{padding:9px;border-bottom:1px so
     </div>
     <select id="ptype"><option value="unidade">Unidade</option><option value="fardo">Fardo</option><option value="caixa">Caixa</option></select><input id="packs" type="number" min="0" placeholder="Fardos/caixas">
 </div>
-<!-- Caixa oculta para renderizar a câmera do celular -->
+<!-- Caixa oculta para renderizar a câmera -->
 <div id="reader" style="width:100%;max-width:360px;margin:10px auto;border-radius:10px;overflow:hidden;display:none;background:#000"></div>
 
 <div class="row"><input id="perpack" type="number" min="1" placeholder="Unidades por fardo/caixa"><input id="loose" type="number" min="0" placeholder="Unidades avulsas"><input id="date" type="date"><input id="lot" placeholder="Lote"></div>
@@ -57,18 +57,27 @@ function openM(id){mid=id;let x=items.find(i=>i.id===id);$('title').textContent=
 function closeM(){$('modal').classList.remove('open');mid=null}
 function move(){let x=items.find(i=>i.id===mid),to=$('to').value,P=+$('mp').value||0,L=+$('ml').value||0;if(!x||to===x.loc)return;if(x.pt==='unidade'){L+=P;P=0}if(P>x.P||L>x.l)return alert('Quantidade maior que a disponível.');let from=x.loc;x.P-=P;x.l-=L;if(to==='loss')items.push({...x,id:Date.now(),loc:'loss',P,l:L,lossDate:new Date().toISOString().slice(0,10),source:from});else{let t=items.find(y=>y.loc===to&&y.p===x.p&&y.b===x.b&&y.v===x.v&&y.f===x.f&&y.date===x.date&&y.lot===x.lot&&y.pt===x.pt&&y.u===x.u&&y.ean===x.ean);if(t){t.P+=P;t.l+=L}else items.push({...x,id:Date.now(),loc:to,P,l:L})}if(total(x)===0)items=items.filter(i=>i.id!==x.id);hist.unshift({d:new Date().toLocaleString('pt-BR'),p:x.p+' '+x.b+' '+x.v,from,to,q:P*x.u+L});save();closeM();render()}
 
-// Funções lógicas do leitor de código de barras integradas
+// Lógica corrigida universal (funciona em PC e celular)
 let scannerObj = null;
 function alternarScanner() {
     const r = $('reader'), b = $('btn-scan');
     if (scannerObj) { fecharScanner(); return; }
+    
+    if (typeof Html5Qrcode === 'undefined') {
+        alert("Aguarde um instante o carregamento do sistema e tente novamente.");
+        return;
+    }
+
     r.style.display = 'block';
     b.textContent = "❌ Parar";
     b.style.backgroundColor = "#dc2626";
+    
     scannerObj = new Html5Qrcode("reader");
+    
+    // Tenta usar a câmera de trás. Se não achar (como no PC), usa qualquer uma disponível
     scannerObj.start(
         { facingMode: "environment" },
-        { fps: 10, qrbox: { width: 260, height: 130 } },
+        { fps: 15, qrbox: { width: 280, height: 140 } },
         (txt) => {
             $('ean').value = txt;
             fecharScanner();
@@ -76,20 +85,10 @@ function alternarScanner() {
         },
         () => {}
     ).catch(() => {
-        alert("Ative a permissão de câmera nos ajustes do site.");
-        fecharScanner();
-    });
-}
-function fecharScanner() {
-    const r = $('reader'), b = $('btn-scan');
-    if (scannerObj) {
-        scannerObj.stop().then(() => {
-            scannerObj = null; r.style.display = 'none';
-            b.textContent = "📷 Scan"; b.style.backgroundColor = "#2563eb";
-        }).catch(() => {
-            r.style.display = 'none'; b.textContent = "📷 Scan"; b.style.backgroundColor = "#2563eb";
-        });
-    } else {
-        r.style.display = 'none'; b.textContent = "📷 Scan"; b.style.backgroundColor = "#2563eb";
-    }
-}
+        // Segunda tentativa caso dê erro de câmera traseira restrita
+        scannerObj.start(
+            { facingMode: "user" },
+            { fps: 15, qrbox: { width: 280, height: 140 } },
+            (txt) => {
+                $('ean').value = txt;
+                fecharScanner();
