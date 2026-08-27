@@ -1,19 +1,3 @@
-const CACHE_NAME = 'estoque-v5-cache';
-const urlsToCache = [
-  './',
-  './index.html',
-  './manifest.json',
-  'https://cloudflare.com'
-];
-
-self.addEventListener('install', event => {
-  event.waitUntil(
-    caches.open(CACHE_NAME).then(cache => cache.addAll(urlsToCache))
-  );
-});
-
-self.addEventListener('fetch', event => {
-  event.respondWith(
-    caches.match(event.request).then(response => response || fetch(event.request))
-  );
-});
+self.addEventListener('install', e => self.skipWaiting());
+self.addEventListener('activate', e => e.waitUntil(self.clients.claim()));
+self.addEventListener('fetch', e => e.respondWith(fetch(e.request)));
