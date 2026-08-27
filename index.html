@@ -2,6 +2,8 @@
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <meta name="theme-color" content="#111827"><link rel="manifest" href="./manifest.json">
 <title>Controle de Estoque V5</title>
+<!-- Biblioteca do Scanner de Código de Barras -->
+<script src="https://unpkg.com" type="text/javascript"></script>
 <style>
 body{font-family:Arial;margin:0;background:#f3f4f6;color:#111827}header{background:#111827;color:white;padding:18px}
 main{max-width:900px;margin:auto;padding:14px}.card{background:white;padding:15px;border-radius:14px;margin:12px 0;box-shadow:0 2px 8px #0001}
@@ -13,6 +15,8 @@ table{width:100%;border-collapse:collapse}th,td{padding:9px;border-bottom:1px so
 .ok{color:#166534}.soon{color:#92400e}.expired{color:#991b1b}
 .modal{display:none;position:fixed;inset:0;background:#0008;align-items:center;justify-content:center;padding:15px}.modal.open{display:flex}.modal>div{background:white;padding:18px;border-radius:14px;width:100%;max-width:520px}
 @media(max-width:700px){.grid{grid-template-columns:1fr 1fr}table,thead,tbody,tr,th,td{display:block}thead{display:none}tr{border:1px solid #ddd;border-radius:10px;margin:8px 0;padding:8px}td{border:0}}
+/* Alinhamento inteligente do campo e botão */
+.barcode-wrapper{display:flex;gap:6px;align-items:center;flex:1;min-width:140px}.btn-scan{background:#2563eb;white-space:nowrap;width:auto;padding:11px 14px}
 </style></head><body>
 <header><h1>📦 Controle de Estoque V5</h1><div>🏬 Depósito ↔ 🛒 Área de Venda ↔ 🔴 Vencidos/Perdas</div></header>
 <main>
@@ -20,7 +24,18 @@ table{width:100%;border-collapse:collapse}th,td{padding:9px;border-bottom:1px so
 <section class="card"><div class="tabs"><button id="bdep" class="active" onclick="view='dep';render()">🏬 Depósito</button><button id="bsale" onclick="view='sale';render()">🛒 Venda</button><button id="bloss" onclick="view='loss';render()">🔴 Perdas</button><button id="ball" onclick="view='all';render()">📋 Todos</button></div></section>
 <section class="card"><h2>➕ Cadastrar produto/lote</h2>
 <div class="row"><select id="cat" onchange="features()"><option value="">Categoria</option><option>Bebidas</option><option>Alimentos</option><option>Limpeza</option><option>Higiene</option><option>Outros</option></select><input id="prod" placeholder="Produto"><input id="brand" placeholder="Marca"><input id="vol" placeholder="Volume"></div>
-<div class="row"><select id="feat"><option>Selecione</option></select><input id="ean" placeholder="Código de barras"><select id="ptype"><option value="unidade">Unidade</option><option value="fardo">Fardo</option><option value="caixa">Caixa</option></select><input id="packs" type="number" min="0" placeholder="Fardos/caixas"></div>
+<div class="row">
+    <select id="feat"><option>Selecione</option></select>
+    <!-- Campo de código de barras com botão integrado ao lado -->
+    <div class="barcode-wrapper">
+        <input id="ean" placeholder="Código de barras">
+        <button type="button" id="btn-scan" class="btn-scan" onclick="alternarScanner()">📷 Scan</button>
+    </div>
+    <select id="ptype"><option value="unidade">Unidade</option><option value="fardo">Fardo</option><option value="caixa">Caixa</option></select><input id="packs" type="number" min="0" placeholder="Fardos/caixas">
+</div>
+<!-- Caixa oculta para renderizar a câmera do celular -->
+<div id="reader" style="width:100%;max-width:360px;margin:10px auto;border-radius:10px;overflow:hidden;display:none;background:#000"></div>
+
 <div class="row"><input id="perpack" type="number" min="1" placeholder="Unidades por fardo/caixa"><input id="loose" type="number" min="0" placeholder="Unidades avulsas"><input id="date" type="date"><input id="lot" placeholder="Lote"></div>
 <div class="row"><select id="loc"><option value="dep">Depósito</option><option value="sale">Área de Venda</option></select><select id="mode"><option value="exact">Quantidade exata</option><option value="approx">Quantidade aproximada</option></select><input id="alert" type="number" min="0" value="7" placeholder="Aviso antes (dias)"></div>
 <button onclick="add()">Adicionar</button></section>
@@ -41,9 +56,40 @@ function add(){let c=$('cat').value,p=$('prod').value.trim(),b=$('brand').value.
 function openM(id){mid=id;let x=items.find(i=>i.id===id);$('title').textContent=x.p+' — '+x.b+' — '+x.v+' — '+x.f+' — '+new Date(x.date+'T00:00:00').toLocaleDateString('pt-BR');$('to').value=x.loc==='dep'?'sale':'dep';$('avail').textContent='Disponível: '+label(x);$('mp').value='';$('ml').value='';$('modal').classList.add('open')}
 function closeM(){$('modal').classList.remove('open');mid=null}
 function move(){let x=items.find(i=>i.id===mid),to=$('to').value,P=+$('mp').value||0,L=+$('ml').value||0;if(!x||to===x.loc)return;if(x.pt==='unidade'){L+=P;P=0}if(P>x.P||L>x.l)return alert('Quantidade maior que a disponível.');let from=x.loc;x.P-=P;x.l-=L;if(to==='loss')items.push({...x,id:Date.now(),loc:'loss',P,l:L,lossDate:new Date().toISOString().slice(0,10),source:from});else{let t=items.find(y=>y.loc===to&&y.p===x.p&&y.b===x.b&&y.v===x.v&&y.f===x.f&&y.date===x.date&&y.lot===x.lot&&y.pt===x.pt&&y.u===x.u&&y.ean===x.ean);if(t){t.P+=P;t.l+=L}else items.push({...x,id:Date.now(),loc:to,P,l:L})}if(total(x)===0)items=items.filter(i=>i.id!==x.id);hist.unshift({d:new Date().toLocaleString('pt-BR'),p:x.p+' '+x.b+' '+x.v,from,to,q:P*x.u+L});save();closeM();render()}
-function render(){['bdep','bsale','bloss','ball'].forEach(x=>$(x).classList.remove('active'));$(view==='dep'?'bdep':view==='sale'?'bsale':view==='loss'?'bloss':'ball').classList.add('active');let q=$('search').value.toLowerCase(),f=$('filter').value,a=items.filter(x=>{let l=view==='all'||view==='dep'&&x.loc==='dep'||view==='sale'&&x.loc==='sale'||view==='loss'&&x.loc==='loss';return l&&(x.p+' '+x.b+' '+x.v+' '+x.f+' '+x.ean+' '+x.lot).toLowerCase().includes(q)&&(view==='loss'||f==='all'||st(x)[0]===f)});$('dep').textContent=items.filter(x=>x.loc==='dep').reduce((s,x)=>s+total(x),0);$('sale').textContent=items.filter(x=>x.loc==='sale').reduce((s,x)=>s+total(x),0);$('soon').textContent=items.filter(x=>x.loc!=='loss'&&st(x)[0]==='soon').reduce((s,x)=>s+total(x),0);$('loss').textContent=items.filter(x=>x.loc==='loss').reduce((s,x)=>s+total(x),0);$('list').innerHTML=a.map(x=>{let s=st(x);return '<tr><td><b>'+x.p+'</b><br>'+x.b+' • '+x.v+' • '+x.f+'<br><small>'+(x.ean||'Sem código')+' • '+(x.lot||'Sem lote')+'</small></td><td>'+(x.loc==='dep'?'🏬 Depósito':x.loc==='sale'?'🛒 Área de Venda':'🔴 Perda')+'</td><td>'+label(x)+'</td><td>'+new Date(x.date+'T00:00:00').toLocaleDateString('pt-BR')+'<br><span class="'+s[0]+'">'+s[1]+'</span></td><td>'+(x.loc==='loss'?'': '<button onclick="openM('+x.id+')">↔ Movimentar</button>')+'</td></tr>'}).join('')||'<tr><td colspan="5">Nenhum item.</td></tr>';$('history').innerHTML=hist.map(h=>'<tr><td>'+h.d+'</td><td>'+h.p+'</td><td>'+h.from+' → '+h.to+'</td><td>'+h.q+' un.</td></tr>').join('')}
-function backup(){let a=document.createElement('a'),b=new Blob([JSON.stringify({items,hist},null,2)],{type:'application/json'});a.href=URL.createObjectURL(b);a.download='backup-estoque-v4.json';a.click()}
-render();
-if('serviceWorker'in navigator)addEventListener('load',()=>navigator.serviceWorker.register('./sw.js'));
-let dp=null;addEventListener('beforeinstallprompt',e=>{e.preventDefault();dp=e;let b=document.createElement('button');b.textContent='📱 Instalar Controle de Estoque';b.style.cssText='position:fixed;bottom:18px;left:50%;transform:translateX(-50%);z-index:9999;padding:14px 18px;border:0;border-radius:12px;background:#111827;color:white;font-weight:bold';b.onclick=async()=>{dp.prompt();await dp.userChoice;dp=null;b.remove()};document.body.appendChild(b)});
-</script></body></html>
+
+// Funções lógicas do leitor de código de barras integradas
+let scannerObj = null;
+function alternarScanner() {
+    const r = $('reader'), b = $('btn-scan');
+    if (scannerObj) { fecharScanner(); return; }
+    r.style.display = 'block';
+    b.textContent = "❌ Parar";
+    b.style.backgroundColor = "#dc2626";
+    scannerObj = new Html5Qrcode("reader");
+    scannerObj.start(
+        { facingMode: "environment" },
+        { fps: 10, qrbox: { width: 260, height: 130 } },
+        (txt) => {
+            $('ean').value = txt;
+            fecharScanner();
+            if (navigator.vibrate) navigator.vibrate(200);
+        },
+        () => {}
+    ).catch(() => {
+        alert("Ative a permissão de câmera nos ajustes do site.");
+        fecharScanner();
+    });
+}
+function fecharScanner() {
+    const r = $('reader'), b = $('btn-scan');
+    if (scannerObj) {
+        scannerObj.stop().then(() => {
+            scannerObj = null; r.style.display = 'none';
+            b.textContent = "📷 Scan"; b.style.backgroundColor = "#2563eb";
+        }).catch(() => {
+            r.style.display = 'none'; b.textContent = "📷 Scan"; b.style.backgroundColor = "#2563eb";
+        });
+    } else {
+        r.style.display = 'none'; b.textContent = "📷 Scan"; b.style.backgroundColor = "#2563eb";
+    }
+}
