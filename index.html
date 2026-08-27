@@ -2,8 +2,8 @@
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <meta name="theme-color" content="#111827"><link rel="manifest" href="./manifest.json">
 <title>Controle de Estoque V5</title>
-<!-- Biblioteca do Scanner (Servidor Ultra Rápido e Estável) -->
-<script src="https://cloudflare.com" integrity="sha512-r6rDA7W6ZeQXYkm8sKmdgPqE7cWDvGAwA5BIU9RSTUsW3668qmBMSLc39hiBw1EqyEv8WyrT1iTvtJgiz6GjxA==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+<!-- Biblioteca do Scanner (Servidor estável cdnjs) -->
+<script src="https://cloudflare.com"></script>
 <style>
 body{font-family:Arial;margin:0;background:#f3f4f6;color:#111827}header{background:#111827;color:white;padding:18px}
 main{max-width:900px;margin:auto;padding:14px}.card{background:white;padding:15px;border-radius:14px;margin:12px 0;box-shadow:0 2px 8px #0001}
@@ -32,13 +32,12 @@ table{width:100%;border-collapse:collapse}th,td{padding:9px;border-bottom:1px so
     <select id="ptype"><option value="unidade">Unidade</option><option value="fardo">Fardo</option><option value="caixa">Caixa</option></select><input id="packs" type="number" min="0" placeholder="Fardos/caixas">
 </div>
 <div id="reader" style="width:100%;max-width:360px;margin:10px auto;border-radius:10px;overflow:hidden;display:none;background:#000"></div>
-
 <div class="row"><input id="perpack" type="number" min="1" placeholder="Unidades por fardo/caixa"><input id="loose" type="number" min="0" placeholder="Unidades avulsas"><input id="date" type="date"><input id="lot" placeholder="Lote"></div>
 <div class="row"><select id="loc"><option value="dep">Depósito</option><option value="sale">Área de Venda</option></select><select id="mode"><option value="exact">Quantidade exata</option><option value="approx">Quantidade aproximada</option></select><input id="alert" type="number" min="0" value="7" placeholder="Aviso antes (dias)"></div>
 <button onclick="add()">Adicionar</button></section>
 <section class="card"><h2>🔎 Controle</h2><div class="row"><input id="search" oninput="render()" placeholder="Pesquisar produto, marca, código ou lote"><select id="filter" onchange="render()"><option value="all">Todas</option><option value="ok">Data boa</option><option value="soon">Próximo vencimento</option><option value="expired">Vencido</option></select></div>
 <div style="overflow:auto"><table><thead><tr><th>Produto</th><th>Local</th><th>Quantidade</th><th>Validade</th><th>Ação</th></tr></thead><tbody id="list"></tbody></table></div></section>
-<section class="card"><h2>🔄 Histórico</h2><div style="overflow:auto"><table><thead><tr><th>Data</th><th>Produto</th><th>Movimento</th><th>Qtd.</th></tr></thead><tbody id="history"></tbody></table></div></section>
+<section class="card"><h2>➕ Histórico</h2><div style="overflow:auto"><table><thead><tr><th>Data</th><th>Produto</th><th>Movimento</th><th>Qtd.</th></tr></thead><tbody id="history"></tbody></table></div></section>
 <section class="card"><button onclick="backup()">💾 Baixar backup</button></section>
 </main>
 <div id="modal" class="modal"><div><h2>🔄 Movimentar</h2><p id="title"></p><select id="to"><option value="sale">🛒 Área de Venda</option><option value="dep">🏬 Depósito</option><option value="loss">🔴 Vencidos/Perdas</option></select><div class="row"><input id="mp" type="number" min="0" placeholder="Fardos/caixas"><input id="ml" type="number" min="0" placeholder="Unidades"></div><p id="avail"></p><button onclick="move()">Confirmar</button><button onclick="closeM()" style="margin-top:8px;background:#6b7280">Cancelar</button></div></div>
@@ -91,3 +90,19 @@ function alternarScanner() {
 function fecharScanner() {
     const r = $('reader'), b = $('btn-scan');
     if (scannerObj) {
+        scannerObj.stop().then(() => {
+            scannerObj = null; r.style.display = 'none';
+            b.textContent = "📷 Scan"; b.style.backgroundColor = "#2563eb";
+        }).catch(() => {
+            scannerObj = null; r.style.display = 'none';
+            b.textContent = "📷 Scan"; b.style.backgroundColor = "#2563eb";
+        });
+    } else {
+        r.style.display = 'none'; b.textContent = "📷 Scan"; b.style.backgroundColor = "#2563eb";
+    }
+}
+
+function render(){['bdep','bsale','bloss','ball'].forEach(x=>$(x).classList.remove('active'));$(view==='dep'?'bdep':view==='sale'?'bsale':view==='loss'?'bloss':'ball').classList.add('active');let q=$('search').value.toLowerCase(),f=$('filter').value,a=items.filter(x=>x.loc===(view==='all'?x.loc:view)&&(x.p.toLowerCase().includes(q)||x.b.toLowerCase().includes(q)||x.ean.includes(q)||x.lot.toLowerCase().includes(q))&&(f==='all'||st(x)===f));$('list').innerHTML=a.map(x=>'<tr><td><b>'+x.p+'</b><br>'+x.b+' '+x.v+'<br><small>#'+x.f+' / Lote: '+x.lot+'</small></td><td>'+(x.loc==='dep'?'🏬 Dep.':'🛒 Venda')+'</td><td>'+label(x)+'</td><td><span class="'+st(x)+'">'+st(x)+'</span><br><small>'+new Date(x.date+'T00:00:00').toLocaleDateString('pt-BR')+'</small></td><td><button onclick="openM('+x.id+')">Mov.</button></td></tr>').join('');$('history').innerHTML=hist.map(x=>'<tr><td>'+x.d+'</td><td>'+x.p+'</td><td>'+(x.from==='dep'?'🏬 Dep.':'🛒 Venda')+' → '+(x.to==='dep'?'🏬 Dep.':x.to==='sale'?'🛒 Venda':'🔴 Perdas')+'</td><td>'+x.q+' un.</td></tr>').join('');$('dep').textContent=items.filter(x=>x.loc==='dep').reduce((a,b)=>a+total(b),0);$('sale').textContent=items.filter(x=>x.loc==='sale').reduce((a,b)=>a+total(b),0);$('soon').textContent=items.filter(x=>st(x)==='soon').length;$('loss').textContent=items.filter(x=>x.loc==='loss').reduce((a,b)=>a+total(b),0)}
+render();features();
+if('serviceWorker' in navigator){navigator.serviceWorker.register('./sw.js').then(()=>{})}
+</script></body></html>
