@@ -1,0 +1,1 @@
+Publique estes arquivos em HTTPS (ex.: GitHub Pages), abra o endereço no Chrome Android e use Instalar aplicativo/Adicionar à tela inicial.

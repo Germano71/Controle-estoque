@@ -1,0 +1,12 @@
+CONTROLE DE ESTOQUE V5 — PWA
+
+V5 baseada na V4 PWA, mantendo as funções existentes:
+- Depósito e Área de Venda
+- Movimentação nos dois sentidos
+- Fardos/caixas e unidades
+- Validade e lote
+- Vencidos/Perdas
+- Histórico de movimentações
+- Código de barras
+- Backup
+- Instalação como PWA
